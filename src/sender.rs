@@ -1,21 +1,22 @@
-use crate::crypto::{encrypt_and_sign, derive_shared_key, decrypt_and_verify};
+use crate::crypto::{encrypt_and_sign, decrypt_and_verify};
 use crate::packet::NewtworkPacket;
 use crate::identity::PeerKeys;
 
-use ed25519_dalek::{SigningKey, VerifyingKey};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signer};
 use std::net::UdpSocket;
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
 use std::io::{self, BufRead};
 use std::thread;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::time::Duration;
+use rand_core::OsRng;
 
 pub fn run_sender(
     my_port: &str,
     peer_ip: &str,
     peer_port: &str,
     peer_keys: &PeerKeys,
-    my_x25519_secret: EphemeralSecret,
+    _my_x25519_secret: EphemeralSecret,
     _my_x25519_public: &PublicKey,
     my_ed25519_secret: &SigningKey,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -23,65 +24,77 @@ pub fn run_sender(
     let socket = UdpSocket::bind(format!("0.0.0.0:{}", my_port))?;
     socket.set_nonblocking(true)?;
 
-    let send_socket = socket.try_clone()?;
-    let recv_socket = socket;
-
     let peer_addr = format!("{}:{}", peer_ip, peer_port);
 
-    let peer_x25519 = PublicKey::from(peer_keys.x25519);
-    let shared_key = derive_shared_key(my_x25519_secret, &peer_x25519);
+    // 🔥 STEP 1 — CREATE EPHEMERAL
+    let my_eph_secret = EphemeralSecret::random_from_rng(OsRng);
+    let my_eph_public = PublicKey::from(&my_eph_secret);
 
-    let running = Arc::new(AtomicBool::new(true));
-    let running_recv = running.clone();
+    // 🔥 STEP 2 — SIGN IT
+    let signature = my_ed25519_secret.sign(my_eph_public.as_bytes());
 
-    // 🔥 RECEIVER THREAD
-    thread::spawn(move || {
-        let mut buf = [0u8; 4096];
+    // 🔥 STEP 3 — SEND HANDSHAKE INIT
+    let init_packet = NewtworkPacket {
+        packet_type: 0,
+        version: 1,
+        source_tag: vec![],
+        destination_tag: vec![],
+        nonce: vec![],
+        ciphertext: vec![],
+        signature: signature.to_bytes().to_vec(),
+        ephemeral_pubkey: my_eph_public.as_bytes().to_vec(),
+        ed25519_pubkey: my_ed25519_secret.verifying_key().to_bytes().to_vec(),
+        fragment_id: 0,
+        sequence_number: 0,
+        total_fragments: 1,
+        is_file: false,
+    };
 
-        while running_recv.load(Ordering::SeqCst) {
-            match recv_socket.recv_from(&mut buf) {
-                Ok((len, _)) => {
-                    let packet: NewtworkPacket =
-                        bincode::deserialize(&buf[..len]).unwrap();
+    let encoded = bincode::serialize(&init_packet)?;
+    socket.send_to(&encoded, &peer_addr)?;
 
-                    let ed_bytes: [u8; 32] = packet.ed25519_pubkey
-                        .as_slice()
-                        .try_into()
-                        .unwrap();
+    println!("🔄 Handshake INIT sent...");
 
-                    let verifying_key = VerifyingKey::from_bytes(&ed_bytes).unwrap();
+    // 🔥 STEP 4 — WAIT FOR RESPONSE
+    let mut buf = [0u8; 4096];
+    let shared_key;
 
-                    match decrypt_and_verify(
-                        &shared_key,
-                        packet.nonce.as_slice().try_into().unwrap(),
-                        &packet.ciphertext,
-                        &packet.signature,
-                        &verifying_key,
-                    ) {
-                        Ok(plaintext) => {
-                            println!("\nPeer: {}", String::from_utf8_lossy(&plaintext));
-                        }
-                        Err(_) => {
-                            println!("\nFailed to decrypt");
-                        }
-                    }
+    loop {
+        match socket.recv_from(&mut buf) {
+            Ok((len, _)) => {
+                let packet: NewtworkPacket =
+                    bincode::deserialize(&buf[..len]).unwrap();
+
+                if packet.packet_type == 1 {
+                    println!("✅ Handshake RESPONSE received");
+
+                    let peer_eph: [u8; 32] =
+                        packet.ephemeral_pubkey.as_slice().try_into().unwrap();
+
+                    let peer_eph_pub = PublicKey::from(peer_eph);
+
+                    let shared = my_eph_secret.diffie_hellman(&peer_eph_pub);
+                    shared_key = *shared.as_bytes();
+
+                    break;
                 }
-                Err(_) => {}
+            }
+            Err(_) => {
+                thread::sleep(Duration::from_millis(100));
             }
         }
-    });
+    }
 
-    // 🔥 SENDER LOOP
+    println!("🔐 Secure session established!");
     println!("Chat started! Type message or /exit");
 
+    // 🔥 CHAT LOOP
     let stdin = io::stdin();
 
     for line in stdin.lock().lines() {
         let input = line?;
 
         if input == "/exit" {
-            running.store(false, Ordering::SeqCst);
-            println!("Session ended.");
             break;
         }
 
@@ -89,6 +102,7 @@ pub fn run_sender(
             encrypt_and_sign(&shared_key, my_ed25519_secret, input.as_bytes());
 
         let packet = NewtworkPacket {
+            packet_type: 2,
             version: 1,
             source_tag: vec![],
             destination_tag: vec![],
@@ -104,7 +118,7 @@ pub fn run_sender(
         };
 
         let encoded = bincode::serialize(&packet)?;
-        send_socket.send_to(&encoded, &peer_addr)?;
+        socket.send_to(&encoded, &peer_addr)?;
     }
 
     Ok(())

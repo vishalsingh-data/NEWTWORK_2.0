@@ -2,6 +2,8 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewtworkPacket {
+    pub packet_type: u8, // 0 = init, 1 = response, 2 = message
+
     pub version: u8,
 
     pub source_tag: Vec<u8>,
