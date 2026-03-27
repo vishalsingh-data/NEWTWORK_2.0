@@ -29,80 +29,121 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("🟢 Node started on {}", my_addr);
 
-    // 🔐 Identity
-    let mut my_identity = Identity::new();
+    if mode == "send" {
+        run_sender(socket, &args)?;
+    } else if mode == "receive" {
+        run_receiver(socket)?;
+    } else {
+        panic!("Invalid mode. Use send or receive");
+    }
 
-    let my_secret = my_identity
+    Ok(())
+}
+
+fn run_sender(socket: UdpSocket, args: &[String]) -> Result<(), Box<dyn Error>> {
+    let peer_ip = get_arg_value(args, "--peer-ip").expect("Missing --peer-ip");
+    let peer_port = get_arg_value(args, "--peer-port").expect("Missing --peer-port");
+
+    let peer_addr = format!("{}:{}", peer_ip, peer_port);
+
+    let mut identity = Identity::new();
+
+    let my_secret = identity
         .x25519_secret
         .take()
         .expect("Secret already taken");
 
-    let my_public = my_identity.x25519_public;
+    let my_public = identity.x25519_public;
 
     let mut buf = [0u8; 1024];
 
     let mut peer_pub: Option<PublicKey> = None;
     let mut peer_ed25519: Option<VerifyingKey> = None;
-    let mut peer_addr: Option<String> = None;
+    let mut got_ack = false;
 
-    println!("⏳ Starting handshake...");
+    println!("⏳ Performing handshake...");
 
-    if mode == "send" {
-        // 🔵 SENDER MODE
-        let peer_ip = get_arg_value(&args, "--peer-ip").expect("Missing --peer-ip");
-        let peer_port = get_arg_value(&args, "--peer-port").expect("Missing --peer-port");
+    loop {
+        let mut key_packet = vec![MSG_KEY];
+        key_packet.extend_from_slice(my_public.as_bytes());
+        key_packet.extend_from_slice(identity.ed25519_public.to_bytes().as_slice());
 
-        let peer = format!("{}:{}", peer_ip, peer_port);
-        peer_addr = Some(peer.clone());
+        socket.send_to(&key_packet, &peer_addr)?;
 
-        let mut got_ack = false;
+        let (size, _) = socket.recv_from(&mut buf)?;
 
-        loop {
-            // Send our key
-            let mut key_packet = vec![MSG_KEY];
-            key_packet.extend_from_slice(my_public.as_bytes());
-            key_packet.extend_from_slice(my_identity.ed25519_public.to_bytes().as_slice());
+        match buf[0] {
+            MSG_KEY => {
+                if size == 65 {
+                    let x25519_bytes: [u8; 32] = buf[1..33].try_into().unwrap();
+                    let ed25519_bytes: [u8; 32] = buf[33..65].try_into().unwrap();
 
-            socket.send_to(&key_packet, &peer)?;
+                    peer_pub = Some(PublicKey::from(x25519_bytes));
+                    peer_ed25519 =
+                        Some(VerifyingKey::from_bytes(&ed25519_bytes).unwrap());
 
-            let (size, src) = socket.recv_from(&mut buf)?;
-
-            match buf[0] {
-                MSG_KEY => {
-                    if size == 65 {
-                        let x25519_bytes: [u8; 32] = buf[1..33].try_into().unwrap();
-                        let ed25519_bytes: [u8; 32] = buf[33..65].try_into().unwrap();
-
-                        peer_pub = Some(PublicKey::from(x25519_bytes));
-                        peer_ed25519 =
-                            Some(VerifyingKey::from_bytes(&ed25519_bytes).unwrap());
-
-                        println!("✅ Received peer public key");
-                    }
+                    println!("✅ Received peer public key");
                 }
-                MSG_ACK => {
-                    got_ack = true;
-                    println!("🤝 Received ACK");
-                }
-                _ => {}
             }
-
-            if peer_pub.is_some() {
-                socket.send_to(&[MSG_ACK], &peer)?;
+            MSG_ACK => {
+                got_ack = true;
+                println!("🤝 Received ACK");
             }
-
-            if peer_pub.is_some() && peer_ed25519.is_some() && got_ack {
-                break;
-            }
+            _ => {}
         }
-    } else if mode == "receive" {
-        // 🟢 RECEIVER MODE (PASSIVE)
+
+        if peer_pub.is_some() {
+            socket.send_to(&[MSG_ACK], &peer_addr)?;
+        }
+
+        if peer_pub.is_some() && peer_ed25519.is_some() && got_ack {
+            break;
+        }
+    }
+
+    let shared_key = derive_shared_key(my_secret, &peer_pub.unwrap());
+
+    println!("🔐 Secure session established!");
+    println!("💬 Chat started! Type message or /exit");
+
+    network::start_chat(
+        socket,
+        peer_addr,
+        shared_key,
+        identity.ed25519_secret.clone(),
+        peer_ed25519.unwrap(),
+    );
+
+    Ok(())
+}
+
+fn run_receiver(socket: UdpSocket) -> Result<(), Box<dyn Error>> {
+    loop {
+        println!("\n🟡 Waiting for incoming connection...");
+
+        let mut identity = Identity::new();
+
+        let my_secret = identity
+            .x25519_secret
+            .take()
+            .expect("Secret already taken");
+
+        let my_public = identity.x25519_public;
+
+        let mut buf = [0u8; 1024];
+
+        let mut peer_pub: Option<PublicKey> = None;
+        let mut peer_ed25519: Option<VerifyingKey> = None;
+        let mut peer_addr: Option<String> = None;
+
         loop {
             let (size, src) = socket.recv_from(&mut buf)?;
 
             match buf[0] {
                 MSG_KEY => {
                     if size == 65 {
+                        println!("📥 Incoming handshake from {}", src);
+
                         let x25519_bytes: [u8; 32] = buf[1..33].try_into().unwrap();
                         let ed25519_bytes: [u8; 32] = buf[33..65].try_into().unwrap();
 
@@ -114,10 +155,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                         println!("✅ Received peer public key");
 
-                        // Send our key back
+                        // Send our key
                         let mut key_packet = vec![MSG_KEY];
                         key_packet.extend_from_slice(my_public.as_bytes());
-                        key_packet.extend_from_slice(my_identity.ed25519_public.to_bytes().as_slice());
+                        key_packet.extend_from_slice(identity.ed25519_public.to_bytes().as_slice());
 
                         socket.send_to(&key_packet, src)?;
 
@@ -131,24 +172,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 _ => {}
             }
         }
-    } else {
-        panic!("Invalid mode. Use send or receive");
+
+        let shared_key = derive_shared_key(my_secret, &peer_pub.unwrap());
+
+        println!("🔐 Secure session established!");
+        println!("💬 Chat started! Type message or /exit");
+
+        network::start_chat(
+            socket.try_clone()?,
+            peer_addr.unwrap(),
+            shared_key,
+            identity.ed25519_secret.clone(),
+            peer_ed25519.unwrap(),
+        );
+
+        println!("🔚 Session ended. Returning to listening...");
     }
-
-    let shared_key = derive_shared_key(my_secret, &peer_pub.unwrap());
-
-    println!("🔐 Secure session established!");
-    println!("💬 Chat started! Type message or /exit");
-
-    network::start_chat(
-        socket,
-        peer_addr.expect("Missing peer addr"),
-        shared_key,
-        my_identity.ed25519_secret.clone(),
-        peer_ed25519.expect("Missing peer ed25519 key"),
-    );
-
-    Ok(())
 }
 
 fn get_arg_value(args: &[String], flag: &str) -> Option<String> {
