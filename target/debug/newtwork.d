@@ -1,0 +1,1 @@
+/home/grey/newtwork_prototype_2/target/debug/newtwork: /home/grey/newtwork_prototype_2/src/bin/newtwork.rs /home/grey/newtwork_prototype_2/src/crypto.rs /home/grey/newtwork_prototype_2/src/identity.rs /home/grey/newtwork_prototype_2/src/lib.rs /home/grey/newtwork_prototype_2/src/network.rs /home/grey/newtwork_prototype_2/src/root_identity/mod.rs
