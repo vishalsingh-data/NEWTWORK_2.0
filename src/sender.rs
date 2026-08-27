@@ -26,14 +26,14 @@ pub fn run_sender(
 
     let peer_addr = format!("{}:{}", peer_ip, peer_port);
 
-    // 🔥 STEP 1 — CREATE EPHEMERAL
+    //  STEP 1 — CREATE EPHEMERAL
     let my_eph_secret = EphemeralSecret::random_from_rng(OsRng);
     let my_eph_public = PublicKey::from(&my_eph_secret);
 
-    // 🔥 STEP 2 — SIGN IT
+    //  STEP 2 — SIGN IT
     let signature = my_ed25519_secret.sign(my_eph_public.as_bytes());
 
-    // 🔥 STEP 3 — SEND HANDSHAKE INIT
+    //  STEP 3 — SEND HANDSHAKE INIT
     let init_packet = NewtworkPacket {
         packet_type: 0,
         version: 1,
@@ -53,9 +53,9 @@ pub fn run_sender(
     let encoded = bincode::serialize(&init_packet)?;
     socket.send_to(&encoded, &peer_addr)?;
 
-    println!("🔄 Handshake INIT sent...");
+    println!(" Handshake INIT sent...");
 
-    // 🔥 STEP 4 — WAIT FOR RESPONSE
+    //  STEP 4 — WAIT FOR RESPONSE
     let mut buf = [0u8; 4096];
     let shared_key;
 
@@ -66,7 +66,7 @@ pub fn run_sender(
                     bincode::deserialize(&buf[..len]).unwrap();
 
                 if packet.packet_type == 1 {
-                    println!("✅ Handshake RESPONSE received");
+                    println!(" Handshake RESPONSE received");
 
                     let peer_eph: [u8; 32] =
                         packet.ephemeral_pubkey.as_slice().try_into().unwrap();
@@ -85,10 +85,10 @@ pub fn run_sender(
         }
     }
 
-    println!("🔐 Secure session established!");
+    println!(" Secure session established!");
     println!("Chat started! Type message or /exit");
 
-    // 🔥 CHAT LOOP
+    //  CHAT LOOP
     let stdin = io::stdin();
 
     for line in stdin.lock().lines() {
