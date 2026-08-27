@@ -22,28 +22,28 @@ impl RootIdentity {
             let data = fs::read_to_string(path).expect("Failed to read root_id.json");
             let identity: RootIdentity = serde_json::from_str(&data).expect("Invalid JSON");
 
-            println!("👋 Welcome back! Please enter your password to unlock your root identity:");
+            println!(" Welcome back! Please enter your password to unlock your root identity:");
             let password = read_password().expect("Failed to read password");
 
             if identity.verify(&password) {
-                println!("✅ Password verified successfully!");
+                println!(" Password verified successfully!");
                 return identity;
             } else {
-                println!("❌ Incorrect password! Exiting.");
+                println!(" Incorrect password! Exiting.");
                 std::process::exit(1);
             }
         } else {
             // First-time user
-            println!("🟢 Generating root ephemeral identity...");
+            println!(" Generating root ephemeral identity...");
 
             let mut bytes = [0u8; 16]; // 128-bit random ID
             OsRng.fill_bytes(&mut bytes);
             let id = hex::encode(bytes);
 
-            println!("🎯 Your root ID: {}", &id);
+            println!(" Your root ID: {}", &id);
             println!("Keep it safe! You will need your password to verify it.");
 
-            println!("🔑 Enter a password to secure your root identity:");
+            println!(" Enter a password to secure your root identity:");
             let password = read_password().expect("Failed to read password");
 
             let password_hash = Self::hash_password(&password);
