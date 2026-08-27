@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let socket = UdpSocket::bind(&my_addr)?;
     socket.set_nonblocking(false)?;
 
-    println!("🟢 Node started on {}", my_addr);
+    println!(" Node started on {}", my_addr);
 
     if mode == "send" {
         run_sender(socket, &args)?;
@@ -83,12 +83,12 @@ fn run_sender(socket: UdpSocket, args: &[String]) -> Result<(), Box<dyn Error>> 
                     peer_ed25519 =
                         Some(VerifyingKey::from_bytes(&ed25519_bytes).unwrap());
 
-                    println!("✅ Received peer public key");
+                    println!(" Received peer public key");
                 }
             }
             MSG_ACK => {
                 got_ack = true;
-                println!("🤝 Received ACK");
+                println!(" Received ACK");
             }
             _ => {}
         }
@@ -104,8 +104,8 @@ fn run_sender(socket: UdpSocket, args: &[String]) -> Result<(), Box<dyn Error>> 
 
     let shared_key = derive_shared_key(my_secret, &peer_pub.unwrap());
 
-    println!("🔐 Secure session established!");
-    println!("💬 Chat started! Type message or /exit");
+    println!(" Secure session established!");
+    println!(" Chat started! Type message or /exit");
 
     network::start_chat(
         socket,
@@ -120,7 +120,7 @@ fn run_sender(socket: UdpSocket, args: &[String]) -> Result<(), Box<dyn Error>> 
 
 fn run_receiver(socket: UdpSocket) -> Result<(), Box<dyn Error>> {
     loop {
-        println!("\n🟡 Waiting for incoming connection...");
+        println!("\n Waiting for incoming connection...");
 
         let mut identity = Identity::new();
 
@@ -143,7 +143,7 @@ fn run_receiver(socket: UdpSocket) -> Result<(), Box<dyn Error>> {
             match buf[0] {
                 MSG_KEY => {
                     if size == 65 {
-                        println!("📥 Incoming handshake from {}", src);
+                        println!(" Incoming handshake from {}", src);
 
                         let x25519_bytes: [u8; 32] = buf[1..33].try_into().unwrap();
                         let ed25519_bytes: [u8; 32] = buf[33..65].try_into().unwrap();
@@ -154,7 +154,7 @@ fn run_receiver(socket: UdpSocket) -> Result<(), Box<dyn Error>> {
 
                         peer_addr = Some(src.to_string());
 
-                        println!("✅ Received peer public key");
+                        println!(" Received peer public key");
 
                         // Send our key
                         let mut key_packet = vec![MSG_KEY];
@@ -165,7 +165,7 @@ fn run_receiver(socket: UdpSocket) -> Result<(), Box<dyn Error>> {
 
                         // Send ACK
                         socket.send_to(&[MSG_ACK], src)?;
-                        println!("🤝 Sent ACK");
+                        println!(" Sent ACK");
 
                         break;
                     }
@@ -176,8 +176,8 @@ fn run_receiver(socket: UdpSocket) -> Result<(), Box<dyn Error>> {
 
         let shared_key = derive_shared_key(my_secret, &peer_pub.unwrap());
 
-        println!("🔐 Secure session established!");
-        println!("💬 Chat started! Type message or /exit");
+        println!(" Secure session established!");
+        println!(" Chat started! Type message or /exit");
 
         network::start_chat(
             socket.try_clone()?,
