@@ -184,7 +184,8 @@ Type `/exit` in either terminal to end the session. The receiver side automatica
 
 ## What it looks like (desktop)
 
-> *[Screenshot — Terminal A: banner + identity card + listen mode waiting]*
+> <img width="665" height="741" alt="image" src="https://github.com/user-attachments/assets/fa169738-6e42-4bb4-b531-6de792117089" />
+
 
 &nbsp;
 
