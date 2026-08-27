@@ -1,5 +1,8 @@
 # NEWTWORK 2.0
 
+> <img width="617" height="106" alt="image" src="https://github.com/user-attachments/assets/9d6b30aa-a9f5-48e3-956b-ebf8bfc86da4" />
+
+
 > *"What if your messages left no trace — not even of who sent them?"*
 
 ---
