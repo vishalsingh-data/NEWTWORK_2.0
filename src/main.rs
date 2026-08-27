@@ -62,7 +62,7 @@ fn run_sender(socket: UdpSocket, args: &[String]) -> Result<(), Box<dyn Error>> 
     let mut peer_ed25519: Option<VerifyingKey> = None;
     let mut got_ack = false;
 
-    println!("⏳ Performing handshake...");
+    println!(" Performing handshake...");
 
     loop {
         let mut key_packet = vec![MSG_KEY];
@@ -187,7 +187,7 @@ fn run_receiver(socket: UdpSocket) -> Result<(), Box<dyn Error>> {
             peer_ed25519.unwrap(),
         );
 
-        println!("🔚 Session ended. Returning to listening...");
+        println!(" Session ended. Returning to listening...");
     }
 }
 
