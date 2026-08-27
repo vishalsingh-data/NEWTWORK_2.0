@@ -189,11 +189,13 @@ Type `/exit` in either terminal to end the session. The receiver side automatica
 
 &nbsp;
 
-> *[Screenshot — Terminal B: connect mode, entering peer details]*
+> <img width="651" height="797" alt="image" src="https://github.com/user-attachments/assets/4add5820-dfbf-4e0d-b516-9e44888b2580" />
+
 
 &nbsp;
 
-> *[Screenshot — both terminals side by side, active chat session]*
+> <img width="1653" height="882" alt="image" src="https://github.com/user-attachments/assets/799d4841-39d1-4d80-88c7-e439b50136ff" />
+
 
 &nbsp;
 
