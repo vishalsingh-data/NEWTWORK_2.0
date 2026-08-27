@@ -26,7 +26,7 @@ pub fn run_receiver(
 
     let mut buf = [0u8; 4096];
 
-    // 🔥 WAIT FOR INIT
+    //  WAIT FOR INIT
     let (shared_key, _) = loop {
         let (len, src) = socket.recv_from(&mut buf)?;
 
@@ -34,7 +34,7 @@ pub fn run_receiver(
             bincode::deserialize(&buf[..len]).unwrap();
 
         if packet.packet_type == 0 {
-            println!("✅ Handshake INIT received");
+            println!(" Handshake INIT received");
 
             let peer_eph: [u8; 32] =
                 packet.ephemeral_pubkey.as_slice().try_into().unwrap();
@@ -78,7 +78,7 @@ pub fn run_receiver(
             let encoded = bincode::serialize(&response_packet)?;
             socket.send_to(&encoded, src)?;
 
-            println!("🔄 Handshake RESPONSE sent");
+            println!(" Handshake RESPONSE sent");
 
             let shared = my_eph_secret.diffie_hellman(&peer_eph_pub);
             let shared_key = *shared.as_bytes();
@@ -87,10 +87,10 @@ pub fn run_receiver(
         }
     };
 
-    println!("🔐 Secure session established!");
+    println!(" Secure session established!");
     println!("Chat started! Type message or /exit");
 
-    // 🔥 CHAT LOOP
+    //  CHAT LOOP
     loop {
         let (len, _) = socket.recv_from(&mut buf)?;
 
