@@ -66,7 +66,7 @@ pub fn decrypt_and_verify(
 pub fn derive_shared_key(secret: EphemeralSecret, public: &PublicKey) -> [u8; 32] {
     let shared_secret = secret.diffie_hellman(public);
 
-    let shared_bytes = shared_secret.to_bytes(); // ✅ FIXED
+    let shared_bytes = shared_secret.to_bytes(); //  FIXED
     let hash = Sha256::digest(shared_bytes);
 
     let mut key = [0u8; 32];
