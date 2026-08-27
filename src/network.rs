@@ -24,7 +24,7 @@ pub fn start_chat(
     let verify_key = peer_verifying_key.clone();
     let sign_key = my_signing_key.clone();
 
-    // 🧵 RECEIVE THREAD
+    //  RECEIVE THREAD
     thread::spawn(move || {
         let mut buf = [0u8; 2048];
 
@@ -33,7 +33,7 @@ pub fn start_chat(
                 Ok((size, _)) => {
                     let data = &buf[..size];
 
-                    // 🔥 Ignore handshake/control packets
+                    //  Ignore handshake/control packets
                     if data.len() < 1 {
                         continue;
                     }
@@ -45,9 +45,9 @@ pub fn start_chat(
                         continue;
                     }
 
-                    // 🔥 DATA FORMAT: [TYPE(1) | nonce(12) | signature(64) | ciphertext]
+                    //  DATA FORMAT: [TYPE(1) | nonce(12) | signature(64) | ciphertext]
                     if data.len() < 1 + 12 + 64 {
-                        println!("⚠️ Invalid packet");
+                        println!(" Invalid packet");
                         continue;
                     }
 
@@ -65,11 +65,11 @@ pub fn start_chat(
                         Ok(plaintext) => {
                             match String::from_utf8(plaintext) {
                                 Ok(msg) => println!("\nPeer: {}", msg),
-                                Err(_) => println!("⚠️ Invalid UTF-8 message"),
+                                Err(_) => println!(" Invalid UTF-8 message"),
                             }
                         }
                         Err(_) => {
-                            println!("⚠️ Decryption/Verification failed");
+                            println!(" Decryption/Verification failed");
                         }
                     }
                 }
@@ -80,7 +80,7 @@ pub fn start_chat(
         }
     });
 
-    // 🧵 SEND LOOP
+    //  SEND LOOP
     println!("Chat started! Type message or /exit");
 
     let stdin = io::stdin();
@@ -96,9 +96,9 @@ pub fn start_chat(
         let (ciphertext, nonce, signature) =
             encrypt_and_sign(&key_send, &sign_key, msg.as_bytes());
 
-        // 🔥 PACK FORMAT: [TYPE | nonce | signature | ciphertext]
+        //  PACK FORMAT: [TYPE | nonce | signature | ciphertext]
         let mut packet = Vec::new();
-        packet.push(MSG_DATA); // 👈 CRITICAL FIX
+        packet.push(MSG_DATA); //  CRITICAL FIX
         packet.extend_from_slice(&nonce);
         packet.extend_from_slice(&signature);
         packet.extend_from_slice(&ciphertext);
